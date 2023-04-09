@@ -9,20 +9,28 @@ export class Converter {
     }
 
     public convert(): void {
-        for (const srcFile of this.program.getSourceFiles()){
+        for (const srcFile of this.program.getSourceFiles().filter(src => !src.fileName.endsWith(".d.ts"))){
             console.log(srcFile.fileName);
             this.convertOneFile(srcFile);
         }
     }
 
     private convertOneFile(srcFile: ts.SourceFile): void {
-        const newNode = ts.visitNode(srcFile, node => {
+        const convResult = ts.transform(srcFile, [this.getTransformerFactory()], this.program.getCompilerOptions());
+        const printed = ts.createPrinter().printNode(ts.EmitHint.Unspecified, convResult.transformed[0], srcFile);
+        console.log(printed);
+    }
 
-            if (ts.isModuleDeclaration(node)) {
-                console.log("found one");
+    private getTransformerFactory(): ts.TransformerFactory<ts.SourceFile> {
+        return (ctx) => {
+
+            const visitor: ts.Visitor = node => {
+                if (ts.isModuleDeclaration(node)) {
+                    console.log("found one");
+                }
+                return ts.visitEachChild(node, visitor, ctx);
             }
-
-            return node;
-        });
+            return (node) => ts.visitNode(node, visitor);
+        };
     }
 }
