@@ -1,0 +1,16 @@
+{
+  "name": "namespace2module",
+  "version": "0.1.0",
+  "author": "someguy20336",
+  "license": "MIT",
+  "main": "dist/cli.js",
+  "files": [],
+  "devDependencies": {},
+  "scripts": {
+    "build": "tsc -p tsconfig.json"
+  },
+  "dependencies": {
+    "typescript": "4.8.4",
+    "commander": "10.0.0"
+  }
+}
