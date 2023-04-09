@@ -16,17 +16,19 @@ export class Converter {
     }
 
     private convertOneFile(srcFile: ts.SourceFile): void {
-        const convResult = ts.transform(srcFile, [this.getTransformerFactory()], this.program.getCompilerOptions());
+        const convResult = ts.transform(srcFile, [this.getRemoveNamespaceTransformerFactory()], this.program.getCompilerOptions());
         const printed = ts.createPrinter().printNode(ts.EmitHint.Unspecified, convResult.transformed[0], srcFile);
         console.log(printed);
     }
 
-    private getTransformerFactory(): ts.TransformerFactory<ts.SourceFile> {
+    private getRemoveNamespaceTransformerFactory(): ts.TransformerFactory<ts.SourceFile> {
         return (ctx) => {
 
             const visitor: ts.Visitor = node => {
                 if (ts.isModuleDeclaration(node)) {
-                    console.log("found one");
+                    return ts.visitNode(node.body, visitor);
+                } else if (ts.isModuleBlock(node)) {
+                    return [...node.statements.values()];
                 }
                 return ts.visitEachChild(node, visitor, ctx);
             }
