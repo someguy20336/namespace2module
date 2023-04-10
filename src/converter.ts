@@ -5,19 +5,45 @@ class FileConverter {
     private sourceFile: ts.SourceFile;
     private program: ts.Program;
     private checker: ts.TypeChecker;
+    private decIndex: DeclarationIndex;
     
     public readonly imports: Map<string, Set<string>> = new Map();
 
-    constructor(sourceFile: ts.SourceFile, program: ts.Program) {
+    constructor(sourceFile: ts.SourceFile, program: ts.Program, decIndex: DeclarationIndex) {
         this.sourceFile = sourceFile;
         this.program = program;
         this.checker = this.program.getTypeChecker();
+        this.decIndex = decIndex;
     }
 
-    public convertOneFile(): void {
+    public convertOneFile(): string {
         const convResult = ts.transform(this.sourceFile, [this.getRemoveNamespaceTransformerFactory(), this.transformNamespaceRefTransformerFactory()], this.program.getCompilerOptions());
-        const printed = ts.createPrinter().printNode(ts.EmitHint.Unspecified, convResult.transformed[0], this.sourceFile);
-        console.log(printed);
+        const newImports: ts.Statement[] = [];
+        for (let file of this.imports.keys()) {
+            // TODO: file needs to be resolved relative to the source file
+            const importIds: string[] = [...this.imports.get(file)!.values()];
+            newImports.push(
+                ts.factory.createImportDeclaration(
+                    undefined,
+                    ts.factory.createImportClause(
+                        false,
+                        undefined,
+                        ts.factory.createNamedImports(
+                            importIds.map(id => ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(id)))
+                        )
+                    ),
+                    ts.factory.createStringLiteral(file)
+                )
+            )
+        }
+        
+        
+        this.sourceFile = ts.factory.updateSourceFile(this.sourceFile, [
+            ...newImports,
+            ...convResult.transformed[0].statements
+        ]);
+        
+        return ts.createPrinter().printNode(ts.EmitHint.Unspecified, this.sourceFile, this.sourceFile);
     }
 
     private getRemoveNamespaceTransformerFactory(): ts.TransformerFactory<ts.SourceFile> {
@@ -48,30 +74,98 @@ class FileConverter {
                     return undefined;   // remove "import x = Some.Namespace"
                 } else if (ts.isPropertyAccessExpression(node)) {
                     const symb = this.checker.getSymbolAtLocation(node.name);
-                    // TODO: use fully qualified name to figure it out?
-                    return node;
+                    const fullName = this.checker.getFullyQualifiedName(symb!);
+                    const fromFile = this.decIndex.getFileForDeclaration(fullName)!;
+                    this.addImport(fromFile, node.name.text);
+                    return node.name;
                 }
                 return ts.visitEachChild(node, visitor, ctx);
             }
             return (node) => ts.visitNode(node, visitor);
         };
     }
+
+    private addImport(fromFile: string, id: string) {
+        if (!this.imports.has(fromFile)) {
+            this.imports.set(fromFile, new Set<string>());
+        }
+
+        this.imports.get(fromFile)?.add(id);
+    }
+}
+
+class DeclarationIndex {
+    private program: ts.Program;
+    private checker: ts.TypeChecker;
+    private currentSrcFile: ts.SourceFile | null = null;
+    private fullNameToFilePath: Map<string, string> = new Map();
+
+    constructor(program:  ts.Program) {
+        this.program = program;
+        this.checker = this.program.getTypeChecker();
+    }
+
+    public getFileForDeclaration(dec: string) {
+        return this.fullNameToFilePath.get(dec);
+    }
+
+    public indexSourceFile(srcFile: ts.SourceFile) {
+        this.currentSrcFile = srcFile;
+        srcFile.forEachChild((node) => this.visitChildForModuleDeclaration(node));
+        this.currentSrcFile = null;
+    }
+
+    private visitChildForModuleDeclaration(node: ts.Node) {
+        if (ts.isModuleDeclaration(node) && node.body) {
+            this.visitModuleDeclarationBody(node.body);
+        } else if (node) {
+            node.forEachChild((node) => this.visitChildForModuleDeclaration(node));
+        }
+    }
+
+    private visitModuleDeclarationBody(node: ts.Node) {
+        if (ts.isModuleDeclaration(node) && node.body) {
+            this.visitModuleDeclarationBody(node.body);
+        } else if (ts.isFunctionDeclaration(node)) {
+            const symb = this.checker.getSymbolAtLocation(node.name!);
+            this.fullNameToFilePath.set(this.checker.getFullyQualifiedName(symb!), this.currentSrcFile!.fileName);
+        } else if (ts.isVariableStatement(node)){
+            for (let v of node.declarationList.declarations) {
+                const symb = this.checker.getSymbolAtLocation(v.name);
+                this.fullNameToFilePath.set(this.checker.getFullyQualifiedName(symb!), this.currentSrcFile!.fileName);
+            }
+        } else {
+            node.forEachChild((node) => this.visitModuleDeclarationBody(node));
+        }
+    }
+
 }
 
 export class Converter {
 
     private program: ts.Program;
+
     constructor(files: string[]) {
         this.program = ts.createProgram(files, {});
     }
 
     public convert(): void {
-        for (const srcFile of this.program.getSourceFiles().filter(src => !src.fileName.endsWith(".d.ts"))){
-            console.log(srcFile.fileName);
-            const fileConv = new FileConverter(srcFile, this.program);
-            fileConv.convertOneFile();
+
+        // index fully qualified functions and variable declarations inside of a given namespace
+        const decVisitor = new DeclarationIndex(this.program);
+        for (const srcFile of this.getUserFiles()){
+            decVisitor.indexSourceFile(srcFile);
+        }
+
+        for (const srcFile of this.getUserFiles()){
+            console.log("Converting file: " + srcFile.fileName);
+            const fileConv = new FileConverter(srcFile, this.program, decVisitor);
+            const newFileText = fileConv.convertOneFile();
+            console.log(newFileText);
         }
     }
 
-
+    public getUserFiles(): ts.SourceFile[] {
+        return this.program.getSourceFiles().filter(src => !src.fileName.endsWith(".d.ts"));    // TODO might be more to this...
+    }
 }

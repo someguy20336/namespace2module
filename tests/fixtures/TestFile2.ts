@@ -4,4 +4,9 @@ namespace Test.One.Four {
     export function SecondFileFunction() {
         return x.TestFunc();
     }
+
+    // Some comments
+    export function FullReference() {
+        return Test.One.Two.aVariable;
+    }
 }
