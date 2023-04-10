@@ -1,3 +1,4 @@
+import path from "path";
 import ts from "typescript";
 
 class FileConverter {
@@ -20,7 +21,7 @@ class FileConverter {
         const convResult = ts.transform(this.sourceFile, [this.getRemoveNamespaceTransformerFactory(), this.transformNamespaceRefTransformerFactory()], this.program.getCompilerOptions());
         const newImports: ts.Statement[] = [];
         for (let file of this.imports.keys()) {
-            // TODO: file needs to be resolved relative to the source file
+            const relPath = path.relative(path.dirname(this.sourceFile.fileName), file);
             const importIds: string[] = [...this.imports.get(file)!.values()];
             newImports.push(
                 ts.factory.createImportDeclaration(
@@ -32,7 +33,7 @@ class FileConverter {
                             importIds.map(id => ts.factory.createImportSpecifier(false, undefined, ts.factory.createIdentifier(id)))
                         )
                     ),
-                    ts.factory.createStringLiteral(file)
+                    ts.factory.createStringLiteral(relPath)
                 )
             )
         }
