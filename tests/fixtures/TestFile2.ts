@@ -7,6 +7,7 @@ namespace Test.One.Four {
 
     // Some comments
     export function FullReference() {
+        
         return Test.One.Two.aVariable;
     }
 }
