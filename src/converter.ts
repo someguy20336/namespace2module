@@ -2,12 +2,16 @@ import ts from "typescript";
 import { decodeEmptyLines, encodeEmptyLines, format } from "./utils";
 import { DeclarationIndex } from "./DeclarationIndex";
 import { SingleFileConverter } from "./SingleFileConverter";
+import { ResultWriter } from "./ResultWriter";
 
 export class Converter {
 
     private program: ts.Program;
+    private writer: ResultWriter;
 
-    constructor(files: string[]) {
+    constructor(files: string[], writer: ResultWriter) {
+
+        this.writer = writer;
         const host = ts.createCompilerHost({}, true);
         host.readFile = (file) =>{
             let contents = ts.sys.readFile(file)!;
@@ -29,7 +33,7 @@ export class Converter {
             const fileConv = new SingleFileConverter(srcFile, this.program, decVisitor);
             let newFileText = fileConv.convertOneFile();
             newFileText = format("Dummy Name.ts", decodeEmptyLines(newFileText));
-            console.log(newFileText);
+            this.writer.writeResult(srcFile.fileName, newFileText);
         }
     }
 

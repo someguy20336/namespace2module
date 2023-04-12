@@ -23,7 +23,11 @@ export class SingleFileConverter {
         const convResult = ts.transform(this.sourceFile, [this.getRemoveNamespaceTransformerFactory(), this.transformNamespaceRefTransformerFactory()], this.program.getCompilerOptions());
         const newImports: ts.Statement[] = [];
         for (let file of this.imports.keys()) {
-            const relPath = path.relative(path.dirname(this.sourceFile.fileName), file);
+            let relPath = path.relative(path.dirname(this.sourceFile.fileName), file);
+            relPath = relPath.substring(0, relPath.length - 3); // Take off the .ts
+            if (!relPath.startsWith(".")) {
+                relPath = "./" + relPath;   // Add ./ if they are in the same directory
+            }
             const importIds: string[] = [...this.imports.get(file)!.values()];
             newImports.push(
                 ts.factory.createImportDeclaration(
