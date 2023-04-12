@@ -41,6 +41,9 @@ class FileConverter {
     }
 
     public convertOneFile(): string {
+
+        // TDOD: get all source text, encode newlines
+        // TODO: create new sourc file node
         const convResult = ts.transform(this.sourceFile, [this.getRemoveNamespaceTransformerFactory(), this.transformNamespaceRefTransformerFactory()], this.program.getCompilerOptions());
         const newImports: ts.Statement[] = [];
         for (let file of this.imports.keys()) {
@@ -67,7 +70,10 @@ class FileConverter {
             ...convResult.transformed[0].statements
         ]);
         
-        return this.format("Dummy Name", this.sourceFile.getText());
+
+        const encoded = ts.createPrinter().printNode(ts.EmitHint.Unspecified, this.sourceFile, this.sourceFile);
+        // TODO: Decode text
+        return this.format("Dummy Name", encoded);
     }
 
     private getRemoveNamespaceTransformerFactory(): ts.TransformerFactory<ts.SourceFile> {
@@ -125,7 +131,8 @@ class FileConverter {
         const edits = languageService.getFormattingEditsForDocument(fileName, {
             // TODO: support more settings here - or settings from a file
             indentSize: 4,
-            convertTabsToSpaces: false
+            convertTabsToSpaces: false,
+            insertSpaceBeforeAndAfterBinaryOperators: true
         });
         edits
             .sort((a, b) => a.span.start - b.span.start)
