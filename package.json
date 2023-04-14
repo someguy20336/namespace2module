@@ -5,7 +5,9 @@
   "license": "MIT",
   "main": "dist/cli.js",
   "files": [],
-  "devDependencies": {},
+  "devDependencies": {
+    "@types/node": "^14.0.27"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.json"
   },
