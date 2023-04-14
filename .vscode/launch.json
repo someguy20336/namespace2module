@@ -12,6 +12,10 @@
                 "<node_internals>/**"
             ],
             "program": "${workspaceFolder}\\dist\\cli.js",
+            "args": [
+                ".\\tsconfig.test.json",
+                "-v"
+            ],
             "preLaunchTask": "tsc: build - tsconfig.json",
             "outFiles": [
                 "${workspaceFolder}/dist/**/*.js"

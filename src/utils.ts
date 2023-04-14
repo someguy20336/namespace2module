@@ -28,8 +28,11 @@ export function format(fileName: string, text: string) {
         // TODO: support more settings here - or settings from a file
         indentSize: 4,
         convertTabsToSpaces: false,
-        insertSpaceBeforeAndAfterBinaryOperators: true
-    });
+        insertSpaceBeforeAndAfterBinaryOperators: true,
+        insertSpaceAfterCommaDelimiter: true,
+        insertSpaceAfterKeywordsInControlFlowStatements: true
+
+    } as ts.FormatCodeSettings);
     edits
         .sort((a, b) => a.span.start - b.span.start)
         .reverse()
