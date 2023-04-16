@@ -24,7 +24,7 @@ export class SingleFileConverter {
         const newImports: ts.Statement[] = [];
         for (let file of this.imports.keys()) {
             let relPath = path.relative(path.dirname(this.sourceFile.fileName), file);
-            relPath = relPath.substring(0, relPath.length - 3); // Take off the .ts
+            relPath = relPath.substring(0, relPath.length - 3).replaceAll("\\", "/"); // Take off the .ts, replace \ with /
             if (!relPath.startsWith(".")) {
                 relPath = "./" + relPath;   // Add ./ if they are in the same directory
             }
@@ -80,16 +80,42 @@ export class SingleFileConverter {
                 if (ts.isImportEqualsDeclaration(node)) {
                     return undefined;   // remove "import x = Some.Namespace"
                 } else if (ts.isPropertyAccessExpression(node)) {
-                    const symb = this.checker.getSymbolAtLocation(node.name);
-                    const fullName = this.checker.getFullyQualifiedName(symb!);
-                    const fromFile = this.decIndex.getFileForDeclaration(fullName)!;
-                    this.addImport(fromFile, node.name.text);
+                    const symb = this.tryAddImportAndGetSymbol(node.name);
+                    if (!symb) {
+                        return node;
+                    }
                     return node.name;
+                } else if (ts.isTypeReferenceNode(node)) {
+                    const symb = this.tryAddImportAndGetSymbol(node.typeName);
+                    if (!symb) {
+                        return node;
+                    }
+                    return ts.factory.createTypeReferenceNode(symb.escapedName.toString());
                 }
                 return ts.visitEachChild(node, visitor, ctx);
             }
             return (node) => ts.visitNode(node, visitor);
         };
+    }
+
+    private tryAddImportAndGetSymbol(nodeForSymb: ts.Node): ts.Symbol | undefined {
+        const symb = this.checker.getSymbolAtLocation(nodeForSymb);
+        // Abort if we can't even find a symbol
+        if (!symb) {
+            return undefined;
+        }
+        const fullName = this.checker.getFullyQualifiedName(symb!);
+        const fromFile = this.decIndex.getFileForDeclaration(fullName)!;
+
+        // Not mapped - could be outside this project, just return the node
+        if (!fromFile) {
+            return undefined;
+        }
+        if (fromFile !== this.sourceFile.fileName) {
+            this.addImport(fromFile, symb.escapedName.toString());
+        }
+
+        return symb;
     }
 
     private addImport(fromFile: string, id: string) {
