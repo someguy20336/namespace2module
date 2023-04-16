@@ -32,7 +32,7 @@ export class DeclarationIndex {
     private visitModuleDeclarationBody(node: ts.Node) {
         if (ts.isModuleDeclaration(node) && node.body) {
             this.visitModuleDeclarationBody(node.body);
-        } else if (ts.isFunctionDeclaration(node)) {
+        } else if (ts.isFunctionDeclaration(node) || ts.isClassDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isEnumDeclaration(node)) {
             const symb = this.checker.getSymbolAtLocation(node.name!);
             this.fullNameToFilePath.set(this.checker.getFullyQualifiedName(symb!), this.currentSrcFile!.fileName);
         } else if (ts.isVariableStatement(node)){
