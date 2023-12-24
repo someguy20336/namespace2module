@@ -1,4 +1,4 @@
-Archiving: I got my use out of it for my projects and no longer planning to maintain it.
+Archiving: I got my use out of it for my projects and no longer plan to maintain it.
 
 If you have a bunch of typescript files using `namespace`, this should convert them to using `import`s.
 
